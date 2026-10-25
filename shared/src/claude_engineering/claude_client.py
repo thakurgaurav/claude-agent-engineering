@@ -1,6 +1,6 @@
 from anthropic import Anthropic
 
-from claude_agent_engineering.common.config import get_anthropic_api_key
+from claude_engineering.config import get_anthropic_api_key
 
 
 def create_claude_client() -> Anthropic:

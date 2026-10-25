@@ -1,0 +1,13 @@
+Analyze the following decision request.
+
+Identify:
+- the decision the user needs to make
+- the user's primary goal
+- any options already mentioned
+- important context explicitly provided
+
+Do not recommend an option.
+Do not invent missing information.
+
+Decision request:
+{decision_request}

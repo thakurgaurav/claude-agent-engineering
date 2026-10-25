@@ -2,6 +2,13 @@ version = 1
 revision = 3
 requires-python = ">=3.12"
 
+[manifest]
+members = [
+    "claude-agent-engineering",
+    "claude-engineering",
+    "workflow-engineering",
+]
+
 [[package]]
 name = "annotated-types"
 version = "0.8.0"
@@ -46,11 +53,7 @@ wheels = [
 [[package]]
 name = "claude-agent-engineering"
 version = "0.1.0"
-source = { editable = "." }
-dependencies = [
-    { name = "anthropic" },
-    { name = "python-dotenv" },
-]
+source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
@@ -60,16 +63,27 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [
-    { name = "anthropic", specifier = ">=2.3.0" },
-    { name = "python-dotenv", specifier = ">=1.2.4" },
-]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "pyright", specifier = ">=1.1.414" },
-    { name = "pytest", specifier = ">=9.1.1" },
-    { name = "ruff", specifier = ">=0.17.2" },
+    { name = "pyright" },
+    { name = "pytest" },
+    { name = "ruff" },
+]
+
+[[package]]
+name = "claude-engineering"
+version = "0.1.0"
+source = { editable = "shared" }
+dependencies = [
+    { name = "anthropic" },
+    { name = "python-dotenv" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "anthropic" },
+    { name = "python-dotenv" },
 ]
 
 [[package]]
@@ -521,3 +535,14 @@ sdist = { url = "https://files.pythonhosted.org/packages/a3/26/b09b8010994eccc3c
 wheels = [
     { url = "https://files.pythonhosted.org/packages/67/81/4add07e5172b7ac40d8ed5ff580409a7801a4fe26d529bdd915401dabfbe/typing_inspection-0.4.4-py3-none-any.whl", hash = "sha256:65b8397ba37ccbce054456aaccddfc91e6e3083c92824df348d96ca832f3f147", size = 14750, upload-time = "2026-08-12T12:37:24.648Z" },
 ]
+
+[[package]]
+name = "workflow-engineering"
+version = "0.1.0"
+source = { editable = "projects/workflow-engineering" }
+dependencies = [
+    { name = "claude-engineering" },
+]
+
+[package.metadata]
+requires-dist = [{ name = "claude-engineering", editable = "shared" }]

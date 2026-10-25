@@ -1,0 +1,24 @@
+Create a concise research plan for the decision below.
+
+Identify only the research items that could materially affect the final decision.
+
+For each item provide exactly:
+- Research item
+- Evidence needed
+- Source type
+- Supports
+
+Rules:
+- Return at most 8 research items.
+- Keep each field to one concise sentence.
+- Combine overlapping evaluation criteria where appropriate.
+- Do not repeat the same evidence under multiple items.
+- Do not perform the research.
+- Do not recommend an option.
+- Do not invent facts about candidate products.
+
+Decision:
+{decision_understanding}
+
+Evaluation criteria:
+{evaluation_criteria}

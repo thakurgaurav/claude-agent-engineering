@@ -1,0 +1,18 @@
+Analyze the following decision constraints.
+
+Define the evaluation criteria that should later be used to compare candidate options.
+
+For each criterion provide exactly:
+- Criterion
+- Source: hard constraint or soft preference
+- Evidence needed
+
+Keep each field concise.
+Include only criteria that could materially affect the decision.
+Do not evaluate or recommend any option.
+Do not invent requirements not supported by the provided constraints.
+
+Return at most 8 criteria.
+
+Decision constraints:
+{constraints}

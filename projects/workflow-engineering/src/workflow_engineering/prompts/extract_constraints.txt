@@ -1,0 +1,18 @@
+Analyze the following decision description.
+
+Separate the information into:
+
+1. Hard constraints
+   Requirements that must be satisfied.
+
+2. Soft preferences
+   Requirements that are important but may be negotiable.
+
+3. Unknowns
+   Missing information that could materially affect the decision.
+
+Do not recommend any option.
+Do not invent missing information.
+
+Decision description:
+{decision_understanding}

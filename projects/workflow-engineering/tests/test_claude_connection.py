@@ -1,5 +1,4 @@
-from claude_agent_engineering.common.claude_client import create_claude_client
-
+from claude_engineering.claude_client import create_claude_client
 
 def test_claude_connection() -> None:
     client = create_claude_client()
