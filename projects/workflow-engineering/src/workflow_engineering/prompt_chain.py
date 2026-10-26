@@ -23,6 +23,7 @@ def _call_model(
     *,
     max_tokens: int = 600,
     thinking_enabled: bool = False,
+    effort: str = "low",
 ) -> str:
     """Send a prompt to Claude using configurable inference settings."""
     client = get_claude_client()
@@ -217,6 +218,7 @@ def create_research_plan(
 
 
 if __name__ == "__main__":
+    #sample requet1 for chaining
     #request = """
     #I need a laptop under $1,500 for Java development,
     #AI experimentation, and occasional video editing.
@@ -224,6 +226,7 @@ if __name__ == "__main__":
     #at least five years.
     #"""
 
+    # sample request 2 for chaining.
     request = """
     I need to plan 7 days trip to Hawaii with my family. 
     We want to visit the beaches, go hiking, water sports, enjoy in the nature.
