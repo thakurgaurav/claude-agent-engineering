@@ -1,5 +1,12 @@
-from importlib.resources import files
+"""Utilities for loading packaged prompt templates.
 
+Author:
+    Gaurav Thakur
+Description:
+    Loads prompt resources from the workflow-engineering package.
+"""
+
+from importlib.resources import files
 
 PROMPT_PACKAGE = "workflow_engineering.prompts"
 

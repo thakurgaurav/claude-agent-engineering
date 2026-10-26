@@ -1,0 +1,28 @@
+Create a concise purchase research plan for the decision below.
+
+Focus on evaluating purchasable options against the user's requirements.
+
+For each item provide exactly:
+- Action
+- Evidence needed
+- Source type
+- Supports
+
+Rules:
+- Return at most 8 items.
+- Prioritize measurable product or service characteristics.
+- Consider price and total ownership cost when relevant.
+- Include compatibility with hard constraints.
+- Prefer reliable primary or authoritative sources where available.
+- Keep each field concise.
+- Do not recommend a specific option.
+- Do not invent specifications, prices, or other facts.
+
+Decision:
+{decision_understanding}
+
+Constraints:
+{constraints}
+
+Evaluation criteria:
+{evaluation_criteria}

@@ -1,0 +1,30 @@
+Create a concise decision plan for the decision below.
+
+The decision does not belong to one of the application's specialized
+purchase, career, or travel routes.
+
+Create a general-purpose plan that identifies what should be examined
+before making the decision.
+
+For each item provide exactly:
+- Action
+- Information needed
+- Supports
+
+Rules:
+- Return at most 8 items.
+- Focus only on factors that could materially affect the decision.
+- Respect the stated constraints and evaluation criteria.
+- Identify important unknowns when relevant.
+- Keep each field concise.
+- Do not recommend a final choice.
+- Do not invent missing facts.
+
+Decision:
+{decision_understanding}
+
+Constraints:
+{constraints}
+
+Evaluation criteria:
+{evaluation_criteria}

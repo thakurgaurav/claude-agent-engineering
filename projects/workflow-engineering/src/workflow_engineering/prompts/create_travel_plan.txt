@@ -1,0 +1,29 @@
+Create a concise travel decision plan for the decision below.
+
+Focus on evaluating travel options against the user's requirements,
+preferences, budget, timing, and practical constraints.
+
+For each item provide exactly:
+- Action
+- Evidence needed
+- Source type
+- Supports
+
+Rules:
+- Return at most 8 items.
+- Consider transportation, accommodation, timing, and total cost when relevant.
+- Consider destination suitability and traveler preferences.
+- Include practical constraints such as dates, duration, and accessibility when relevant.
+- Prefer current and authoritative travel information where available.
+- Keep each field concise.
+- Do not recommend a specific destination or booking.
+- Do not invent prices, availability, schedules, or travel requirements.
+
+Decision:
+{decision_understanding}
+
+Constraints:
+{constraints}
+
+Evaluation criteria:
+{evaluation_criteria}

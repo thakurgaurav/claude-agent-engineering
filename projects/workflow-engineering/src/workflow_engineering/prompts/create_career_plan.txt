@@ -1,0 +1,29 @@
+Create a concise career decision plan for the decision below.
+
+Focus on evaluating the decision in terms of professional growth,
+skills, opportunity, effort, cost, and long-term career value.
+
+For each item provide exactly:
+- Action
+- Evidence needed
+- Source type
+- Supports
+
+Rules:
+- Return at most 8 items.
+- Prioritize career outcomes and skill relevance.
+- Consider required time, cost, and effort when relevant.
+- Consider employer or market relevance when applicable.
+- Include compatibility with hard constraints.
+- Keep each field concise.
+- Do not recommend a specific career choice.
+- Do not invent salary, hiring, or market facts.
+
+Decision:
+{decision_understanding}
+
+Constraints:
+{constraints}
+
+Evaluation criteria:
+{evaluation_criteria}

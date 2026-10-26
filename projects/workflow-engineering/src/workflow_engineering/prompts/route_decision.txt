@@ -1,0 +1,30 @@
+Classify the following decision into exactly one supported route.
+
+Supported routes:
+
+PURCHASE
+Use when the user is deciding whether or what product, service, or other
+purchasable option to choose.
+
+CAREER
+Use for decisions involving career direction, professional development,
+education, certifications, or job opportunities.
+
+TRAVEL
+Use for decisions involving destinations, accommodation, transportation,
+or travel planning.
+
+GENERAL
+Use when the decision does not clearly belong to another supported route.
+
+Return exactly one of these values:
+
+PURCHASE
+CAREER
+TRAVEL
+GENERAL
+
+Do not include explanations, punctuation, or additional text.
+
+Decision:
+{decision_understanding}
