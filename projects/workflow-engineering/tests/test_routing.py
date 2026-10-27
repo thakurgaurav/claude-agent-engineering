@@ -1,4 +1,10 @@
-"""Tests for decision routing behavior."""
+"""Tests for decision routing behavior.
+
+Author:
+    Gaurav Thakur
+Description:
+    Verifies route validation and route-specific planning behavior.
+"""
 
 import pytest
 from workflow_engineering.routing import (
