@@ -23,12 +23,12 @@ Implemented workflow patterns:
 - [x] Prompt Chaining
 - [x] Routing
 - [x] Parallelization + Aggregation
-- [ ] Evaluator–Optimizer
+- [x] Evaluator–Optimizer
 - [ ] Orchestrator–Worker
 
 Current workflow progression:
 
-```text id="u5kdxk"
+```text
 Prompt Chaining
       ↓
 Routing
@@ -40,9 +40,9 @@ Evaluator–Optimizer
 Orchestrator–Worker
 ```
 
-The project currently demonstrates the progression from deterministic application-controlled workflows toward increasingly model-directed execution:
+The project demonstrates a progression from deterministic application-controlled workflows toward increasingly model-directed execution.
 
-```text id="rhm7w4"
+```text
 Prompt Chaining
       ↓
 Application controls a predefined sequence
@@ -58,9 +58,21 @@ Claude selects independent capabilities
 Application executes them concurrently
       +
 Claude semantically aggregates the results
+
+Evaluator–Optimizer
+      ↓
+Claude generates an initial result
+      +
+Claude evaluates the result against semantic quality criteria
+      +
+Evaluator feedback drives bounded optimization
+      +
+Application controls iteration limits and termination
 ```
 
-Current capabilities demonstrated include:
+### Capabilities Demonstrated
+
+Current implementations demonstrate:
 
 - multi-stage Claude workflows
 - semantic routing
@@ -73,9 +85,103 @@ Current capabilities demonstrated include:
 - real external tool integrations
 - semantic aggregation
 - failure isolation and graceful degradation
-- shared dependency caching
+- semantic evaluation
+- evaluator-generated actionable feedback
+- iterative result optimization
+- bounded evaluator–optimizer loops
+- explicit workflow termination conditions
+- structured-output validation
+- bounded structured-output repair
+- controlled failure after repeated invalid model output
+- Pydantic-based model contracts
+- MongoDB-backed deterministic filtering
+- separation of hard constraints from semantic preferences
+- shared dependency management
 - separation between Claude-facing capabilities and provider infrastructure
 
-The current implementation remains **workflow-oriented rather than autonomous**. The application still owns execution boundaries, concurrency, failure handling, workflow lifecycle, and termination.
+### Evaluator–Optimizer
 
-**Current focus:** Evaluator–Optimizer.
+The Evaluator–Optimizer implementation demonstrates a production-oriented quality-improvement loop using a rental recommendation workflow.
+
+```text
+User Request
+      ↓
+Requirement Interpreter
+      ↓
+MongoDB Hard Filtering
+      ↓
+Candidate Properties
+      ↓
+Generator
+      ↓
+Recommendation
+      ↓
+Evaluator
+      │
+      ├── PASS ──────────────────────► Finish
+      │
+      └── NEEDS_REVISION
+                ↓
+         Actionable Feedback
+                ↓
+            Optimizer
+                ↓
+      Revised Recommendation
+                ↓
+            Evaluator
+                ↓
+          PASS / Continue
+                ↓
+       Bounded Iteration Limit
+```
+
+The implementation separates deterministic and semantic responsibilities:
+
+- MongoDB applies deterministic hard constraints.
+- Claude interprets semantic preferences.
+- The generator selects and explains a recommendation.
+- The evaluator acts as a semantic quality gate.
+- The optimizer uses evaluator feedback to revise the result.
+- The application owns the optimization loop and maximum iteration count.
+- Pydantic validates structured model output before it enters the workflow.
+- Invalid structured output receives one bounded repair attempt before failing explicitly.
+
+The workflow also demonstrates an important reliability principle:
+
+> Optimization does not guarantee convergence.
+
+If the evaluator continues to reject a result, the application stops after the configured optimization limit rather than allowing an unbounded model loop.
+
+A successful initial recommendation bypasses optimization entirely:
+
+```text
+Generator
+    ↓
+Evaluator
+    ↓
+PASS
+    ↓
+Finish
+
+Optimization iterations: 0
+```
+
+A recommendation requiring improvement follows the optimization path:
+
+```text
+Generator
+    ↓
+Evaluator
+    ↓
+NEEDS_REVISION
+    ↓
+Optimizer
+    ↓
+Evaluator
+    ↓
+PASS or bounded continuation
+```
+
+The current implementation remains **workflow-oriented rather than autonomous**. Claude makes semantic decisions inside explicitly defined stages, while the application owns execution boundaries, concurrency, retries, validation, workflow lifecycle, optimization limits, and termination.
+
+**Current focus:** Orchestrator–Worker.
