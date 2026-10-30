@@ -11,8 +11,8 @@ The project focuses on how application code can coordinate model reasoning throu
 | Prompt Chaining | ✅ Implemented |
 | Routing | ✅ Implemented |
 | Parallelization + Aggregation | ✅ Implemented |
-| Evaluator–Optimizer | ⬜ Next |
-| Orchestrator–Worker | ⬜ Planned |
+| Evaluator–Optimizer | ✅ Implemented |
+| Orchestrator–Worker | ⬜ Next |
 
 ---
 
@@ -892,6 +892,210 @@ That distinction becomes important in later Agent Engineering labs.
 
 ---
 
+# 04 — Evaluator–Optimizer
+
+Evaluator–Optimizer introduces controlled iterative improvement. The
+application generates a recommendation, evaluates it against the user's
+requirements and semantic preferences, and only invokes the optimizer when
+the evaluator requests revision.
+
+## Use Case — Rental Property Recommendation
+
+The workflow recommends a rental property from a MongoDB-backed property
+dataset. The requirement interpreter converts the natural-language request
+into a `RentalSearchIntent` containing deterministic hard constraints and
+semantic preferences.
+
+## Architecture
+
+```text
+User Request
+      ↓
+Requirement Interpreter
+      ↓
+RentalSearchIntent
+      │
+      ├── Hard Constraints
+      └── Semantic Preferences
+      ↓
+MongoDB Hard Filtering
+      ↓
+Eligible Candidates
+      ↓
+Generator
+      ↓
+Recommendation
+      ↓
+Evaluator
+      │
+      ├── PASS ─────────────────────► Final Result
+      │
+      └── NEEDS_REVISION
+                ↓
+        Actionable Feedback
+                ↓
+            Optimizer
+                ↓
+       Revised Recommendation
+                ↓
+            Evaluator
+                ↓
+       PASS / Bounded Continuation
+```
+
+## Requirement Interpreter
+
+Claude converts the natural-language rental request into structured intent.
+The implementation separates hard constraints from semantic preferences.
+
+Hard constraints include:
+
+- city
+- maximum monthly rent
+- minimum bedrooms
+- minimum bathrooms
+- pets required
+- parking required
+- property type
+
+Semantic preferences include:
+
+- safety
+- space
+- newness
+- walkability
+- schools
+- transit
+- in-unit laundry
+- gym
+- pool
+- air conditioning
+- furnished
+
+This separation matters because hard constraints determine eligibility, while
+preferences guide the semantic comparison of properties that are already
+eligible. Unsupported requirements are retained in the intent so they are
+visible to downstream recommendation stages.
+
+## MongoDB Hard Filtering
+
+The repository applies deterministic constraints before recommendation
+reasoning:
+
+```text
+Structured Search Criteria
+        ↓
+MongoDB Query
+        ↓
+Eligible Candidate Properties
+```
+
+The database answers:
+
+> Which properties are eligible?
+
+Claude answers:
+
+> Which eligible property best satisfies the user's semantic preferences?
+
+Claude does not perform the deterministic database filtering.
+
+## Generator
+
+The generator receives the original request, interpreted intent and eligible
+candidates. It returns a structured `RentalRecommendationOutput` containing:
+
+- `recommended_property_id`
+- `reasoning`
+- `tradeoffs`
+
+The application validates that the selected property ID belongs to the
+eligible candidate set. A recommendation outside that set fails explicitly.
+
+## Evaluator
+
+The evaluator is a semantic quality gate. Its structured output has one of
+these statuses:
+
+```text
+PASS
+```
+
+or:
+
+```text
+NEEDS_REVISION
++ actionable feedback
+```
+
+When revision is required, the evaluator model validator requires at least
+one feedback item so the optimizer receives a useful optimization signal.
+
+## Optimizer
+
+The optimizer receives the original request, interpreted preferences,
+candidate evidence, previous recommendation, and evaluator feedback. It
+produces another structured recommendation after applying that feedback.
+
+The application validates the optimized property ID against the same eligible
+candidate set. The optimizer may retain the previous property or select a
+different eligible property; it cannot bypass the candidate set.
+
+## Bounded Optimization Loop
+
+The application, not Claude, owns the loop, iteration limit, and termination:
+
+```text
+Generate
+   ↓
+Evaluate
+   │
+   ├── PASS ───────────────► STOP
+   │
+   └── NEEDS_REVISION
+              ↓
+           Optimize
+              ↓
+           Evaluate
+              │
+              ├── PASS ────► STOP
+              │
+              └── NEEDS_REVISION
+                         ↓
+                   Limit reached?
+                     │      │
+                    No     Yes
+                     │      │
+                     ▼      ▼
+                  Optimize  STOP
+```
+
+The rental selection demo configures `max_optimization_iterations=2`.
+Optimization is bounded improvement, not guaranteed convergence.
+
+## Happy Path
+
+When the initial recommendation passes evaluation, the optimizer is not
+executed:
+
+```text
+Generator
+    ↓
+Evaluator
+    ↓
+PASS
+    ↓
+STOP
+
+Optimization iterations: 0
+```
+
+Evaluator–Optimizer does not mean every result must be optimized. The
+evaluator is a quality gate, and a passing initial result completes the
+workflow immediately.
+
+---
+
 # Project Organization
 
 Implementation, provider integrations, prompts, tests, and runnable demonstrations are intentionally separated.
@@ -1201,7 +1405,7 @@ Parallelization + Aggregation
 
 # Current Engineering Boundary
 
-The project now demonstrates three increasingly dynamic workflow patterns:
+The project now demonstrates four increasingly dynamic workflow patterns:
 
 ```text
 Prompt Chaining
@@ -1214,13 +1418,24 @@ Routing
 Model-selected predefined branch
 
 
-Parallelization
+Parallelization + Aggregation
       ↓
 Model-selected capabilities
 +
 application-managed concurrent execution
 +
 model-based semantic aggregation
+
+
+Evaluator–Optimizer
+      ↓
+model-generated recommendation
++
+semantic evaluation
++
+feedback-driven bounded refinement
++
+application-controlled termination
 ```
 
 The current implementation intentionally does not yet introduce:
@@ -1231,7 +1446,8 @@ The current implementation intentionally does not yet introduce:
 - arbitrary model-directed execution
 - custom agent harnesses
 
-Tool execution is now present, but it remains inside a controlled workflow.
+Tool execution and iterative refinement are present, but they remain inside
+controlled workflows.
 
 At the current stage:
 
@@ -1240,6 +1456,7 @@ Application
     ↓
 owns execution lifecycle,
 concurrency, boundaries,
+validation, retries, optimization limits,
 failure handling and termination
 
 
@@ -1247,7 +1464,8 @@ Claude
     ↓
 performs reasoning,
 route selection,
-tool selection and aggregation
+tool selection, aggregation, evaluation,
+and refinement
 within those boundaries
 ```
 
@@ -1255,47 +1473,32 @@ The objective is to understand these control boundaries clearly before increasin
 
 ---
 
-# Next — Evaluator–Optimizer
+# Next — Orchestrator–Worker
 
-The next workflow pattern introduces iterative improvement.
-
-Instead of accepting the first generated result:
-
-```text
-Input
-  ↓
-Generator
-  ↓
-Result
-```
-
-the workflow introduces an evaluation and refinement cycle:
+The next workflow pattern introduces dynamic task decomposition and
+delegation. Instead of repeatedly refining one result, an orchestrator
+analyzes a goal and determines which specialized pieces of work are required.
 
 ```text
-Input
-  ↓
-Generator
-  ↓
-Candidate
-  ↓
-Evaluator
-  ↓
-Quality acceptable?
-  │
-  ├── Yes ─────────► Final Result
-  │
-  └── No
-       ↓
-    Feedback
-       ↓
-    Optimizer
-       ↓
-    Improved Candidate
-       └──────────────► Evaluator
+User Goal
+    ↓
+Orchestrator
+    ↓
+Task Decomposition
+    │
+    ├── Worker A
+    ├── Worker B
+    └── Worker C
+          ↓
+     Worker Results
+          ↓
+      Orchestrator
+          ↓
+      Final Result
 ```
 
 This introduces the next engineering question:
 
-> How can model-generated output be evaluated against explicit criteria and improved without creating an uncontrolled agent loop?
+> How can Claude dynamically decompose a goal into specialized units of work while the application still maintains explicit execution boundaries and control?
 
-That becomes **Workflow Pattern 04 — Evaluator–Optimizer**.
+That becomes **Workflow Pattern 05 — Orchestrator–Worker**.

@@ -1,4 +1,10 @@
-"""Air quality integration for travel safety workflows."""
+"""Air quality integration for travel safety workflows.
+
+Author:
+    Gaurav Thakur
+Description:
+    Retrieves and normalizes air-quality observations for travel decisions.
+"""
 
 import time
 from dataclasses import dataclass

@@ -1,4 +1,10 @@
-"""Configuration for workflow-engineering integrations."""
+"""Configuration for workflow-engineering integrations.
+
+Author:
+    Gaurav Thakur
+Description:
+    Loads environment-backed settings for external APIs and MongoDB.
+"""
 
 import os
 from dataclasses import dataclass
@@ -28,6 +34,14 @@ class FirmsSettings:
     source: str
     timeout_seconds: float
 
+@dataclass(frozen=True)
+class MongoDbConfig:
+    """Mongodb Configuration for connecting to mongodb"""
+    uri: str
+    database: str
+    properties_collection: str
+
+
 
 def get_external_api_settings() -> ExternalApiSettings:
     """Load Open-Meteo API configuration from environment variables."""
@@ -45,17 +59,7 @@ def get_external_api_settings() -> ExternalApiSettings:
         ("OPEN_METEO_AIR_QUALITY_URL", air_quality_url),
     ]
 
-    missing = [
-        name
-        for name, value in required_settings
-        if not value
-    ]
-
-    if missing:
-        raise RuntimeError(
-            "Missing required Open-Meteo configuration: "
-            + ", ".join(missing)
-        )
+    check_missing(required_settings, "Missing required Open-Meteo configuration: ")
 
     return ExternalApiSettings(
         open_meteo_geocoding_url=cast(str, geocoding_url),
@@ -81,17 +85,7 @@ def get_firms_settings() -> FirmsSettings:
         ("NASA_FIRMS_SOURCE", source),
     ]
 
-    missing = [
-        name
-        for name, value in required_settings
-        if not value
-    ]
-
-    if missing:
-        raise RuntimeError(
-            "Missing required NASA FIRMS configuration: "
-            + ", ".join(missing)
-        )
+    check_missing(required_settings, "Missing required NASA FIRMS configuration: ")
 
     return FirmsSettings(
         map_key=cast(str, map_key),
@@ -99,3 +93,36 @@ def get_firms_settings() -> FirmsSettings:
         source=cast(str, source),
         timeout_seconds=timeout_seconds,
     )
+
+def get_mongodb_settings() -> MongoDbConfig:
+    """Load MongoDB configuration from environment variables."""
+    uri = os.getenv("MONGODB_URI")
+    database = os.getenv("MONGODB_DATABASE")
+    properties_collection = os.getenv("MONGODB_PROPERTIES_COLLECTION")
+
+    required_settings = [
+        ("MONGODB_URI", uri),
+        ("MONGODB_DATABASE", database),
+        ("MONGODB_PROPERTIES_COLLECTION", properties_collection),
+    ]
+
+    check_missing(required_settings, "Missing required MongoDB configuration: ")
+    return MongoDbConfig(
+        uri = cast(str, uri),
+        database = cast(str, database),
+        properties_collection= cast(str, properties_collection),
+    )
+
+def check_missing(
+    required_settings: list[tuple[str, str | None]],
+    error_message: str,
+) -> None:
+    missing = [
+        name
+        for name, value in required_settings
+        if not value
+    ]
+    if missing:
+        raise RuntimeError(
+            error_message + ", ".join(missing)
+        )

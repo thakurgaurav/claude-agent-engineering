@@ -1,4 +1,10 @@
-"""NASA FIRMS fire activity integration for travel safety workflows."""
+"""NASA FIRMS fire activity integration for travel safety workflows.
+
+Author:
+    Gaurav Thakur
+Description:
+    Retrieves, parses, and filters satellite fire detections by location.
+"""
 
 import csv
 import io
