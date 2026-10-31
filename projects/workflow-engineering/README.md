@@ -80,7 +80,7 @@ flowchart LR
     W --> WAPI[Open-Meteo]
     Q --> QAPI[Open-Meteo AQ]
     F --> FAPI[NASA FIRMS]
-    WAPI --> R[tool_result[]]
+    WAPI --> R["tool_result[]"]
     QAPI --> R
     FAPI --> R
     R --> C[Claude semantic aggregation]
