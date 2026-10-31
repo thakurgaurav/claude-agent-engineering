@@ -1,10 +1,8 @@
 # Workflow Engineering with Claude
 
-A hands-on engineering demonstration of controlled AI workflow patterns using Claude.
+A hands-on demonstration of controlled AI workflow patterns using Claude. Application code coordinates model reasoning through predefined execution structures before introducing autonomous agents.
 
-The project focuses on how application code can coordinate model reasoning through predefined execution structures before moving into autonomous agent systems.
-
-## Workflow Patterns
+## Workflow patterns
 
 | Pattern | Status |
 |---|---|
@@ -14,1492 +12,193 @@ The project focuses on how application code can coordinate model reasoning throu
 | Evaluator–Optimizer | ✅ Implemented |
 | Orchestrator–Worker | ⬜ Next |
 
+## 01 — Prompt Chaining
 
----
-
-# 01 — Prompt Chaining
-
-Prompt Chaining decomposes a complex request into a predefined sequence of focused model interactions.
-
-## Use Case
-
-The workflow converts an open-ended decision request into a structured research plan.
-
-Example:
+Prompt Chaining decomposes a complex decision into focused, sequential model calls:
 
 ```text
-I need a laptop under $1,500 for Java development,
-AI experimentation, and occasional video editing.
-Battery life is important and I want to keep it
-for at least five years.
+Decision request → Understand → Extract constraints
+                 → Define criteria → Research plan
 ```
 
-## Architecture
+```mermaid
+flowchart LR
+    A[Decision request] --> B[Understand decision]
+    B --> C[Extract constraints]
+    C --> D[Define evaluation criteria]
+    D --> E[Create research plan]
+    B:::claude
+    C:::claude
+    D:::claude
+    E:::claude
+    classDef claude fill:#e8f0fe,stroke:#4f7cac
+```
+
+The implementation demonstrates focused prompts, explicit state propagation, per-stage model configuration, bounded outputs, response/truncation validation, and externalized prompt templates. Application code defines the sequence; Claude reasons within each stage.
+
+## 02 — Routing
+
+Routing adds model-directed branching while keeping execution application-controlled:
 
 ```text
-Decision Request
-      ↓
-Understand Decision
-      ↓
-Extract Constraints
-      ↓
-Define Evaluation Criteria
-      ↓
-Create Research Plan
+Request → Understand → Extract constraints → Define criteria
+       → Claude router → DecisionRoute validation → route handler
 ```
 
-Each stage performs one focused responsibility.
+```mermaid
+flowchart TD
+    A[Decision request] --> B[Understand and extract]
+    B --> C[Define criteria]
+    C --> D[Claude semantic router]
+    D --> E{DecisionRoute validation}
+    E -->|PURCHASE| P[Purchase handler]
+    E -->|CAREER| R[Career handler]
+    E -->|TRAVEL| T[Travel handler]
+    E -->|GENERAL| G[General handler]
+    E -. invalid label .-> X[Explicit validation failure]
+```
 
-The output of one stage becomes context for the next stage.
+Supported routes are `PURCHASE`, `CAREER`, `TRAVEL`, and `GENERAL`. Claude returns a label; `DecisionRoute` validates it, and Python dispatches to the corresponding predefined handler. Invalid values fail explicitly.
 
-## Engineering Characteristics
+Route handlers emphasize product requirements and ownership (`PURCHASE`), skills and career value (`CAREER`), destination and practical constraints (`TRAVEL`), or general factors, trade-offs, missing information, and next steps (`GENERAL`). Claude selects among allowed capabilities; it cannot create arbitrary paths.
 
-The implementation demonstrates:
+## 03 — Parallelization + Aggregation
 
-- task decomposition
-- focused prompts
-- explicit state propagation
-- per-stage model configuration
-- bounded outputs
-- response validation
-- truncation detection
-- externalized prompt templates
-
-The execution path is predefined by application code.
-
-Claude reasons within each stage but does not determine which stage executes next.
-
-Therefore, this is a **workflow**, not an autonomous agent.
-
----
-
-# 02 — Routing
-
-Routing introduces conditional execution.
-
-Instead of sending every request through the same downstream processing path, Claude classifies the semantic intent of the decision and the application dispatches execution to a predefined specialized path.
-
-## Goal
-
-The routing workflow demonstrates:
+This workflow answers a travel-safety question using independent real-world signals: Open-Meteo weather, Open-Meteo air quality, and NASA FIRMS satellite thermal detections.
 
 ```text
-Same Entry Point
-      ↓
-Semantic Classification
-      ↓
-Validated Route
-      ↓
-Application-Controlled Dispatch
-      ↓
-Route-Specific Processing
-      ↓
-Route-Specific Decision Plan
+Request → Claude selects tools → application runs tools concurrently
+        → tool_result[] → Claude semantically aggregates → assessment
 ```
 
-## Supported Routes
+```mermaid
+flowchart LR
+    A[Travel-safety request] --> B[Claude selects tools]
+    B --> W[Weather tool]
+    B --> Q[Air-quality tool]
+    B --> F[Fire-activity tool]
+    W --> WAPI[Open-Meteo]
+    Q --> QAPI[Open-Meteo AQ]
+    F --> FAPI[NASA FIRMS]
+    WAPI --> R[tool_result[]]
+    QAPI --> R
+    FAPI --> R
+    R --> C[Claude semantic aggregation]
+    C --> O[Safety assessment]
+    W -. concurrent .-> Q
+    Q -. concurrent .-> F
+```
 
-The application currently defines four routes:
+Claude may return multiple `tool_use` blocks. The application executes synchronous provider calls with `asyncio.to_thread()` and coordinates them with `asyncio.gather()`, then returns matching `tool_result` blocks by `tool_use_id`. Failures use `return_exceptions=True`, allowing Claude to produce a degraded result from available evidence.
+
+The Claude-facing tools hide provider URLs, authentication, geocoding, response formats, caching, and HTTP details. Shared location resolution uses a process-local, normalized-destination cache protected only during writes; network calls occur outside the lock. A cold concurrent request may duplicate geocoding work, an intentional trade-off for this demonstration. FIRMS results are reported as satellite thermal detections, not one wildfire per detection.
+
+The repository retains an Anthropic Tool Runner implementation for comparison, but the explicit runner makes protocol and concurrency responsibilities visible. Parallel execution reduces wall-clock time toward the slowest independent branch; it does not make providers faster.
+
+## 04 — Evaluator–Optimizer
+
+The rental-selection workflow recommends a property from a MongoDB-backed dataset:
 
 ```text
-PURCHASE
-CAREER
-TRAVEL
-GENERAL
+Request → requirement interpreter → RentalSearchIntent
+        → MongoDB hard filtering → eligible candidates
+        → generator → evaluator ── PASS → finish
+                              └── NEEDS_REVISION → optimizer → evaluator
 ```
 
-These routes are application-defined.
-
-Claude cannot dynamically create additional execution paths.
-
-## Complete Architecture
-
-```text
-Natural-Language Decision Request
-               ↓
-        Understand Decision
-               ↓
-        Extract Constraints
-               ↓
-   Define Evaluation Criteria
-               ↓
-          Claude Router
-               ↓
-       DecisionRoute Validation
-               ↓
-    ┌──────────┼──────────┬──────────┐
-    ↓          ↓          ↓          ↓
-PURCHASE     CAREER     TRAVEL     GENERAL
-    ↓          ↓          ↓          ↓
-Purchase    Career      Travel     General
-  Plan        Plan        Plan        Plan
-    └──────────┴──────────┴──────────┘
-               ↓
-      Route-Specific Result
+```mermaid
+flowchart TD
+    A[Rental request] --> B[Claude requirement interpreter]
+    B --> I[RentalSearchIntent]
+    I --> M[MongoDB hard filtering]
+    M --> C[Eligible candidates]
+    C --> G[Claude generator]
+    G --> E[Semantic evaluator]
+    E -->|PASS| F[Final recommendation]
+    E -->|NEEDS_REVISION + feedback| O[Optimizer]
+    O --> E
+    G -. validated property ID .-> V[Application validation]
+    O -. validated property ID .-> V
+    V -. eligible set only .-> F
 ```
 
-## Semantic Router
+Claude separates deterministic hard constraints (city, rent, bedrooms, bathrooms, pets, parking, property type) from semantic preferences (safety, space, newness, walkability, schools, transit, amenities, and furnishing). MongoDB determines eligibility; Claude chooses and explains among eligible properties. Unsupported requirements remain visible in the intent.
 
-Claude is used as a bounded semantic classifier.
+The generator and optimizer return validated `RentalRecommendationOutput` values, and selected IDs must belong to the eligible set. The evaluator returns `PASS` or `NEEDS_REVISION` with actionable feedback. The application owns the loop and termination; the demo configures `max_optimization_iterations=2`. A passing initial result skips optimization, and repeated rejection stops at the limit—optimization does not guarantee convergence.
 
-Conceptually:
-
-```text
-Input:
-"The user needs to choose a laptop..."
-
-Output:
-PURCHASE
-```
-
-The router prompt explicitly restricts output to:
-
-```text
-PURCHASE
-CAREER
-TRAVEL
-GENERAL
-```
-
-The returned model output is converted into the application's typed route:
-
-```python
-DecisionRoute(model_output.strip())
-```
-
-This creates an explicit model/application boundary:
-
-```text
-Model Output
-     ↓
-Untrusted String
-     ↓
-DecisionRoute Validation
-     ↓
-Validated Application Value
-```
-
-Unsupported values fail validation instead of silently entering the execution flow.
-
-## Application-Controlled Dispatch
-
-After Claude selects a valid route, Python controls what actually executes.
-
-Conceptually:
-
-```text
-DecisionRoute.PURCHASE
-        ↓
-create_purchase_plan()
-
-DecisionRoute.CAREER
-        ↓
-create_career_plan()
-
-DecisionRoute.TRAVEL
-        ↓
-create_travel_plan()
-
-DecisionRoute.GENERAL
-        ↓
-create_general_plan()
-```
-
-This separation is fundamental:
-
-> Claude selects among allowed routes. The application defines and controls the capabilities behind those routes.
-
-## Route-Specific Behavior
-
-### PURCHASE
-
-Focuses on areas such as:
-
-- product or service requirements
-- measurable characteristics
-- price
-- total ownership considerations
-- compatibility
-- reliability
-- long-term suitability
-
-### CAREER
-
-Focuses on areas such as:
-
-- skill relevance
-- professional growth
-- time investment
-- financial cost
-- credential or market recognition
-- long-term career value
-- alternatives
-
-### TRAVEL
-
-Focuses on areas such as:
-
-- destination suitability
-- timing
-- weather
-- transportation
-- accommodation
-- total trip cost
-- traveler preferences
-- practical constraints
-
-### GENERAL
-
-Provides a fallback decision-analysis path for requests that do not belong to one of the specialized domains.
-
-It focuses on:
-
-- relevant decision factors
-- missing information
-- constraints
-- trade-offs
-- actionable next steps
-
-## Example Routing Behavior
-
-```text
-Laptop decision
-      ↓
-PURCHASE
-      ↓
-Purchase-specific plan
-
-
-AI certification decision
-      ↓
-CAREER
-      ↓
-Career-specific plan
-
-
-Vacation decision
-      ↓
-TRAVEL
-      ↓
-Travel-specific plan
-
-
-Personal schedule decision
-      ↓
-GENERAL
-      ↓
-General decision plan
-```
-
-The important behavior is not simply that Claude returns different labels.
-
-The selected label causes the application to execute a **different predefined downstream path**.
-
-## Workflow, Not Agent
-
-Routing introduces model-directed branching, but the system is still a workflow.
-
-Claude can decide:
-
-```text
-Which supported route best matches this request?
-```
-
-Claude cannot decide:
-
-```text
-What arbitrary capability should I execute next?
-```
-
-The application still owns:
-
-- available routes
-- route validation
-- route handlers
-- execution boundaries
-- workflow termination
-
----
-
-# 03 — Parallelization + Aggregation
-
-Parallelization executes independent operations concurrently instead of waiting for each operation to finish sequentially.
-
-This lab also introduces Claude Tool Use and demonstrates the distinction between:
-
-- Claude selecting tools
-- the Anthropic tool-use protocol
-- application-managed tool execution
-- semantic aggregation of independent results
-
-## Use Case — Travel Safety Intelligence
-
-The workflow answers a travel-safety question using three independent real-world signals.
-
-Example:
-
-```text
-I'm planning to spend the day outdoors in Los Angeles
-on October 30, 2026.
-
-Check the weather forecast, air quality, and recent nearby
-fire activity.
-
-Use all three sources and tell me whether conditions look
-suitable for outdoor activities.
-```
-
-The workflow gathers:
-
-1. Weather — Open-Meteo
-2. Air Quality — Open-Meteo Air Quality
-3. Recent satellite thermal activity — NASA FIRMS
-
-These operations are independent and can therefore execute concurrently.
-
-## Architecture
-
-```text
-Travel Request
-      │
-      ▼
-    Claude
-      │
-      │ identifies required capabilities
-      ▼
-Multiple tool_use requests
-      │
-      ├────────────────┬──────────────────┐
-      ▼                ▼                  ▼
-   Weather         Air Quality       Fire Activity
-      │                │                  │
- Open-Meteo       Open-Meteo AQ        NASA FIRMS
-      │                │                  │
-      └────────────────┼──────────────────┘
-                       ▼
-                tool_result[]
-                       │
-                       ▼
-                     Claude
-                       │
-                       ▼
-             Semantic Aggregation
-                       │
-                       ▼
-             Travel Safety Assessment
-```
-
-## Claude-Facing Tools
-
-Claude is exposed to capability-oriented tools:
-
-```python
-get_destination_weather(destination, travel_date)
-
-get_destination_air_quality(destination, travel_date)
-
-get_nearby_fire_activity(destination)
-```
-
-The tool contracts describe capabilities rather than infrastructure.
-
-Claude does not need to know:
-
-- provider API URLs
-- API authentication details
-- geographic coordinate lookup implementation
-- raw provider response formats
-- caching implementation
-- HTTP client details
-
-Those responsibilities remain inside the application.
-
-## Claude Tool Selection
-
-Claude receives the user request together with the available tool definitions.
-
-For a request requiring weather, air quality, and fire activity, Claude can return multiple `tool_use` blocks in the same response.
-
-Conceptually:
-
-```text
-Claude Response
-      │
-      ├── tool_use: get_destination_weather
-      │
-      ├── tool_use: get_destination_air_quality
-      │
-      └── tool_use: get_nearby_fire_activity
-```
-
-This is an important distinction:
-
-> Claude can request multiple tools in parallel, but the application determines how those tools are actually executed.
-
-Tool selection and tool execution are separate responsibilities.
-
-## Application-Managed Parallel Execution
-
-Because the three tools are independent, the application executes them concurrently.
-
-Conceptually:
-
-```text
-Claude
-  │
-  ├── Weather tool request
-  ├── Air Quality tool request
-  └── Fire Activity tool request
-             │
-             ▼
-      asyncio.gather(...)
-             │
-     ┌───────┼────────┐
-     ▼       ▼        ▼
- Weather     AQ      FIRMS
-     │       │        │
-     └───────┼────────┘
-             ▼
-       Tool Results
-```
-
-The provider integrations currently use synchronous HTTP calls.
-
-They are therefore executed through:
-
-```python
-asyncio.to_thread(...)
-```
-
-The resulting tasks are coordinated using:
-
-```python
-await asyncio.gather(...)
-```
-
-This allows independent blocking provider calls to overlap without requiring the provider modules themselves to become asynchronous.
-
-## Fan-Out / Fan-In
-
-The workflow demonstrates a classic fan-out / fan-in pattern.
-
-```text
-                    ┌── Weather ───────┐
-                    │                  │
-Request ──► Claude ─┼── Air Quality ───┼──► Claude ──► Result
-                    │                  │
-                    └── Fire Activity ─┘
-```
-
-### Fan-Out
-
-Claude identifies multiple independent capabilities.
-
-The application executes those operations concurrently.
-
-### Fan-In
-
-The application collects all resulting `tool_result` blocks and returns them to Claude together.
-
-Claude then reasons across the combined evidence.
-
-## Anthropic Tool Protocol
-
-Each Claude tool request contains a tool-use identifier.
-
-Conceptually:
-
-```text
-tool_use
-    │
-    ├── id
-    ├── tool name
-    └── input
-```
-
-After executing the tool, the application returns:
-
-```text
-tool_result
-    │
-    ├── tool_use_id
-    └── content
-```
-
-The `tool_use_id` associates each result with the tool request that produced it.
-
-Multiple results are returned together before Claude performs final aggregation.
-
-## Semantic Aggregation
-
-The final step is not simple concatenation.
-
-Claude receives evidence from multiple sources:
-
-```text
-Weather
-   +
-Air Quality
-   +
-Fire Activity
-       ↓
-     Claude
-       ↓
-Cross-signal reasoning
-       ↓
-Travel Safety Assessment
-```
-
-Claude can reason about relationships between signals.
-
-For example:
-
-```text
-Mild weather
-     +
-Moderate air quality
-     +
-Nearby recent thermal detections
-     ↓
-Generally suitable conditions,
-but with environmental caution
-```
-
-This is **semantic aggregation**.
-
-The model interprets the combined meaning of the results rather than merely joining strings.
-
-## NASA FIRMS Data Semantics
-
-NASA FIRMS provides satellite thermal/fire hotspot detections.
-
-A detection does not necessarily represent a unique wildfire.
-
-Multiple detections may correspond to:
-
-- the same fire event
-- industrial heat sources
-- agricultural burning
-- volcanic activity
-- other thermal anomalies
-
-For this reason, the workflow reports FIRMS data as:
-
-```text
-satellite thermal detections
-```
-
-rather than interpreting every detection as a separate wildfire.
-
-The Claude-facing tool provides a compact signal including:
-
-- number of nearby detections
-- search radius
-- search period
-- closest detection distance
-- most recent detection date
-
-Claude then incorporates that signal into the overall assessment.
-
-## Failure Isolation
-
-Parallel workflows introduce an important reliability concern.
-
-If three independent branches execute concurrently, failure of one branch should not necessarily destroy successful results from the others.
-
-The workflow therefore uses:
-
-```python
-await asyncio.gather(
-    *tool_tasks,
-    return_exceptions=True,
-)
-```
-
-Conceptually:
-
-```text
-Weather ───────────── SUCCESS ───┐
-                                 │
-Air Quality ──────── TIMEOUT ────┼──► Aggregate available evidence
-                                 │
-Fire Activity ─────── SUCCESS ───┘
-```
-
-A failed tool execution is converted into a tool result with an error indication.
-
-Conceptually:
-
-```text
-tool_result
-    │
-    ├── tool_use_id
-    ├── is_error = true
-    └── concise failure information
-```
-
-Claude can then produce a degraded result using the information that remains available.
-
-This demonstrates **graceful degradation** rather than all-or-nothing execution.
-
-## Shared Location Resolution
-
-All three travel intelligence tools need geographic coordinates.
-
-For example:
-
-```text
-"Los Angeles"
-      ↓
-latitude
-longitude
-```
-
-Location resolution is therefore implemented as a shared provider capability.
-
-```text
-Weather ───────┐
-               │
-Air Quality ───┼──► resolve_location()
-               │
-Fire Activity ─┘
-```
-
-## Process-Local Location Cache
-
-Repeatedly resolving the same destination would create unnecessary geocoding requests.
-
-Location resolution therefore uses a process-local in-memory cache.
-
-```text
-Destination
-     │
-     ▼
-Location Cache
-     │
-     ├── HIT ─────────────► Location
-     │
-     └── MISS
-           │
-           ▼
-      Geocoding API
-           │
-           ▼
-       Cache Result
-           │
-           ▼
-        Location
-```
-
-The cache is intentionally simple.
-
-It is:
-
-- process-local
-- memory-based
-- keyed by normalized destination
-- shared by the travel tools
-- protected during writes
-
-## Minimal Lock Duration
-
-The cache lock is not held during external network operations.
-
-The pattern is:
-
-```text
-Cache lookup
-     │
-     ├── HIT → return
-     │
-     ▼
-    MISS
-     │
-     ▼
-Geocoding HTTP call       ← no lock
-     │
-     ▼
-Parse response            ← no lock
-     │
-     ▼
-Acquire lock
-     │
-Check cache again
-     │
-Write if necessary
-     │
-Release lock
-```
-
-This prevents a slow network operation from unnecessarily holding a shared lock.
-
-## Cold-Cache Behavior
-
-During the first concurrent request, multiple branches can observe the cache before any branch has populated it.
-
-For example:
-
-```text
-Weather             Air Quality             Fire
-   │                     │                    │
-cache lookup          cache lookup         cache lookup
-   │                     │                    │
- MISS                  MISS                 MISS
-   │                     │                    │
-geocoding API         geocoding API        geocoding API
-```
-
-Once one result has been stored, subsequent requests in the same running process use the cached value.
-
-This is an intentional trade-off for this demonstration.
-
-Preventing duplicate cold-cache work would require additional coordination such as:
-
-- per-key synchronization
-- single-flight/request coalescing
-- distributed locking for multi-instance systems
-
-Those mechanisms are not required to demonstrate the workflow pattern.
-
-The same general cold-cache problem can also occur with distributed caches such as Redis unless additional coordination or cache warming is used.
-
-## Tool Runner Comparison
-
-The Anthropic SDK provides a Tool Runner that can manage much of the Claude ↔ tool execution lifecycle.
-
-This lab retains a Tool Runner implementation for comparison.
-
-However, the explicit application-managed implementation is used to make concurrency behavior visible.
-
-This lets the project demonstrate the distinction between:
-
-```text
-Claude capability
-      ↓
-Generate multiple tool requests
-
-Anthropic protocol
-      ↓
-tool_use / tool_result
-
-Application responsibility
-      ↓
-Execute independent tools concurrently
-```
-
-The important engineering conclusion is:
-
-> Claude produces parallel tool calls; the application determines their execution semantics.
-
-## Observed Execution
-
-A successful three-tool run produced approximately:
-
-```text
-Claude tool selection:     2.26s
-Parallel tool execution:   3.45s
-Claude aggregation:        4.26s
-Total:                     9.97s
-```
-
-The parallel execution phase approaches the latency of the slowest independent branch rather than requiring the application to wait for the sum of all branch latencies.
-
-Conceptually:
-
-```text
-Sequential
-
-Weather  ─── 2.5s
-AQ             ─── 3.0s
-FIRMS                 ─── 2.0s
-
-≈ 7.5s
-
-
-Parallel
-
-Weather  ───────── 2.5s
-AQ       ───────────── 3.0s
-FIRMS    ─────── 2.0s
-
-≈ 3.0s
-```
-
-Parallelization reduces workflow wall-clock latency when operations are independent.
-
-It does not make the individual external services faster.
-
-## Engineering Lessons
-
-This lab demonstrates:
-
-- Parallelization as a workflow pattern
-- Claude Tool Use
-- multiple `tool_use` blocks in one Claude response
-- Anthropic `tool_use` / `tool_result` protocol
-- application-managed concurrency
-- fan-out / fan-in orchestration
-- `asyncio.gather()`
-- `asyncio.to_thread()`
-- semantic aggregation
-- failure isolation
-- graceful degradation
-- capability-oriented tool design
-- separation of Claude-facing tools from provider implementations
-- real external API integration
-- shared dependency caching
-- minimal lock duration
-- cold-cache behavior
-- distinction between cache safety and duplicate-work suppression
-- distinction between tool selection and tool execution
-
-## Workflow, Not Agent
-
-Despite using Claude Tool Use, this implementation remains a workflow.
-
-Claude has authority to determine which exposed information capabilities are needed.
-
-The application still owns:
-
-```text
-tool availability
-execution mechanics
-concurrency
-failure handling
-result collection
-aggregation lifecycle
-workflow termination
-```
-
-Conceptually:
-
-```text
-Claude
-   ↓
-"What capabilities do I need?"
-
-Application
-   ↓
-"How are those capabilities executed?"
-
-Claude
-   ↓
-"What does the combined evidence mean?"
-```
-
-There is no autonomous agent loop in which Claude repeatedly decides arbitrary next actions until a goal is complete.
-
-That distinction becomes important in later Agent Engineering labs.
-
----
-
-# 04 — Evaluator–Optimizer
-
-Evaluator–Optimizer introduces controlled iterative improvement. The
-application generates a recommendation, evaluates it against the user's
-requirements and semantic preferences, and only invokes the optimizer when
-the evaluator requests revision.
-
-## Use Case — Rental Property Recommendation
-
-The workflow recommends a rental property from a MongoDB-backed property
-dataset. The requirement interpreter converts the natural-language request
-into a `RentalSearchIntent` containing deterministic hard constraints and
-semantic preferences.
-
-## Architecture
-
-```text
-User Request
-      ↓
-Requirement Interpreter
-      ↓
-RentalSearchIntent
-      │
-      ├── Hard Constraints
-      └── Semantic Preferences
-      ↓
-MongoDB Hard Filtering
-      ↓
-Eligible Candidates
-      ↓
-Generator
-      ↓
-Recommendation
-      ↓
-Evaluator
-      │
-      ├── PASS ─────────────────────► Final Result
-      │
-      └── NEEDS_REVISION
-                ↓
-        Actionable Feedback
-                ↓
-            Optimizer
-                ↓
-       Revised Recommendation
-                ↓
-            Evaluator
-                ↓
-       PASS / Bounded Continuation
-```
-
-## Requirement Interpreter
-
-Claude converts the natural-language rental request into structured intent.
-The implementation separates hard constraints from semantic preferences.
-
-Hard constraints include:
-
-- city
-- maximum monthly rent
-- minimum bedrooms
-- minimum bathrooms
-- pets required
-- parking required
-- property type
-
-Semantic preferences include:
-
-- safety
-- space
-- newness
-- walkability
-- schools
-- transit
-- in-unit laundry
-- gym
-- pool
-- air conditioning
-- furnished
-
-This separation matters because hard constraints determine eligibility, while
-preferences guide the semantic comparison of properties that are already
-eligible. Unsupported requirements are retained in the intent so they are
-visible to downstream recommendation stages.
-
-## MongoDB Hard Filtering
-
-The repository applies deterministic constraints before recommendation
-reasoning:
-
-```text
-Structured Search Criteria
-        ↓
-MongoDB Query
-        ↓
-Eligible Candidate Properties
-```
-
-The database answers:
-
-> Which properties are eligible?
-
-Claude answers:
-
-> Which eligible property best satisfies the user's semantic preferences?
-
-Claude does not perform the deterministic database filtering.
-
-## Generator
-
-The generator receives the original request, interpreted intent and eligible
-candidates. It returns a structured `RentalRecommendationOutput` containing:
-
-- `recommended_property_id`
-- `reasoning`
-- `tradeoffs`
-
-The application validates that the selected property ID belongs to the
-eligible candidate set. A recommendation outside that set fails explicitly.
-
-## Evaluator
-
-The evaluator is a semantic quality gate. Its structured output has one of
-these statuses:
-
-```text
-PASS
-```
-
-or:
-
-```text
-NEEDS_REVISION
-+ actionable feedback
-```
-
-When revision is required, the evaluator model validator requires at least
-one feedback item so the optimizer receives a useful optimization signal.
-
-## Optimizer
-
-The optimizer receives the original request, interpreted preferences,
-candidate evidence, previous recommendation, and evaluator feedback. It
-produces another structured recommendation after applying that feedback.
-
-The application validates the optimized property ID against the same eligible
-candidate set. The optimizer may retain the previous property or select a
-different eligible property; it cannot bypass the candidate set.
-
-## Bounded Optimization Loop
-
-The application, not Claude, owns the loop, iteration limit, and termination:
-
-```text
-Generate
-   ↓
-Evaluate
-   │
-   ├── PASS ───────────────► STOP
-   │
-   └── NEEDS_REVISION
-              ↓
-           Optimize
-              ↓
-           Evaluate
-              │
-              ├── PASS ────► STOP
-              │
-              └── NEEDS_REVISION
-                         ↓
-                   Limit reached?
-                     │      │
-                    No     Yes
-                     │      │
-                     ▼      ▼
-                  Optimize  STOP
-```
-
-The rental selection demo configures `max_optimization_iterations=2`.
-Optimization is bounded improvement, not guaranteed convergence.
-
-## Happy Path
-
-When the initial recommendation passes evaluation, the optimizer is not
-executed:
-
-```text
-Generator
-    ↓
-Evaluator
-    ↓
-PASS
-    ↓
-STOP
-
-Optimization iterations: 0
-```
-
-Evaluator–Optimizer does not mean every result must be optimized. The
-evaluator is a quality gate, and a passing initial result completes the
-workflow immediately.
-
----
-
-# Project Organization
-
-Implementation, provider integrations, prompts, tests, and runnable demonstrations are intentionally separated.
+## Project organization
 
 ```text
 src/workflow_engineering/
-├── demos/
-│   ├── __init__.py
-│   ├── prompt_chaining_demo.py
-│   ├── routing_demo.py
-│   └── parallel_travel_demo.py
-│
-├── prompts/
-│   ├── __init__.py
-│   ├── understand_decision.txt
-│   ├── extract_constraints.txt
-│   ├── define_evaluation_criteria.txt
-│   ├── create_research_plan.txt
-│   ├── route_decision.txt
-│   ├── create_purchase_plan.txt
-│   ├── create_career_plan.txt
-│   ├── create_travel_plan.txt
-│   └── create_general_plan.txt
-│
-├── tools/
-│   ├── __init__.py
-│   ├── location.py
-│   ├── weather.py
-│   ├── air_quality.py
-│   ├── fire_activity.py
-│   └── travel_tools.py
-│
-├── config.py
-├── model.py
+├── demos/       # runnable demonstrations
+├── prompts/     # packaged model instructions
+├── tools/       # Claude-facing tools and provider integrations
+├── config.py    # environment-backed configuration
+├── model.py     # common text-oriented Claude invocation
 ├── parallelization.py
 ├── prompt_chain.py
 ├── prompt_loader.py
 └── routing.py
 ```
 
-The responsibilities are:
+Workflow modules own orchestration; prompts define model behavior; tools isolate external services; demos provide inputs and output; tests provide automated verification. The rental workflow and its supporting modules follow the same separation of interpretation, filtering, generation, evaluation, and optimization.
 
-```text
-model.py
-    ↓
-Common text-oriented Claude invocation policy
+## Model, prompts, and responses
 
+`model.py` centralizes model selection, token limits, thinking configuration, text extraction, and truncation detection for ordinary text calls. Tool workflows use the shared Anthropic client directly to access structured Tool Use and its iterative lifecycle.
 
-prompt_chain.py
-    ↓
-Prompt Chaining implementation
+Prompts are packaged text resources so model instructions can evolve independently of orchestration. Response handling selects relevant text blocks instead of assuming `response.content[0].text`, joins text content, and checks completion behavior. Tool workflows additionally process `tool_use` and `tool_result` blocks.
 
+## Configuration
 
-routing.py
-    ↓
-Routing implementation
-
-
-parallelization.py
-    ↓
-Parallel Tool Use + aggregation orchestration
-
-
-tools/
-    ↓
-Claude-facing capabilities and external provider integrations
-
-
-config.py
-    ↓
-External service configuration
-
-
-prompts/
-    ↓
-Model behavior contracts
-
-
-demos/
-    ↓
-Independently runnable demonstrations
-
-
-tests/
-    ↓
-Automated verification
-```
-
-This keeps demonstration inputs and console output out of reusable workflow implementation.
-
-It also separates Claude-facing capability contracts from external provider infrastructure.
-
----
-
-# Model Invocation
-
-Common text-oriented model invocation behavior lives in:
-
-```text
-model.py
-```
-
-This layer handles concerns such as:
-
-- Claude model selection
-- maximum output tokens
-- thinking configuration
-- Anthropic response content blocks
-- text extraction
-- truncation detection
-
-Prompt Chaining and Routing use this common capability.
-
-Parallelization uses the shared Anthropic client directly because the workflow needs access to Claude's structured Tool Use protocol and iterative tool execution lifecycle.
-
----
-
-# Prompt Management
-
-Prompts are stored as packaged text resources rather than embedded directly inside Python functions where appropriate.
-
-For example:
-
-```text
-prompts/
-├── route_decision.txt
-├── create_purchase_plan.txt
-├── create_career_plan.txt
-├── create_travel_plan.txt
-└── create_general_plan.txt
-```
-
-This keeps:
-
-```text
-Workflow orchestration
-```
-
-separate from:
-
-```text
-Model instructions
-```
-
-and allows individual prompts to evolve without mixing prompt content into application control logic.
-
----
-
-# Configuration
-
-Infrastructure and environment-specific values are externalized from implementation modules.
-
-Examples include:
+Copy `.env.example` to `.env` and provide local credentials/configuration as needed. Common settings include:
 
 ```text
 ANTHROPIC_API_KEY
-
 OPEN_METEO_GEOCODING_URL
 OPEN_METEO_FORECAST_URL
 OPEN_METEO_AIR_QUALITY_URL
-
 NASA_FIRMS_MAP_KEY
 NASA_FIRMS_AREA_API_URL
 NASA_FIRMS_SOURCE
-
 EXTERNAL_API_TIMEOUT_SECONDS
+MONGODB_URI
+MONGODB_DATABASE
+MONGODB_PROPERTIES_COLLECTION
 ```
 
-Real credentials belong in the local `.env` file.
+Credentials belong only in `.env`; application code reads them through the configuration layer.
 
-`.env.example` documents required configuration without containing secrets.
+## Running demonstrations
 
-Application code accesses these values through the configuration layer rather than hard-coding provider infrastructure.
-
----
-
-# Response Handling
-
-Anthropic responses may contain different content-block types.
-
-The implementation does not assume:
-
-```python
-response.content[0].text
-```
-
-Instead, relevant content blocks are explicitly selected.
-
-For normal text-oriented model calls:
-
-```text
-Claude Response
-      ↓
-Multiple Content Blocks
-      ↓
-Select Text Blocks
-      ↓
-Join Text Content
-      ↓
-Application Result
-```
-
-Tool-based workflows additionally process structured:
-
-```text
-tool_use
-tool_result
-```
-
-content blocks.
-
-The implementation also checks response completion behavior so incomplete model output is not silently treated as a successful complete result.
-
----
-
-# Running the Demonstrations
-
-## Prompt Chaining
+From the repository root:
 
 ```bash
-uv run --project projects/workflow-engineering \
-  python -m workflow_engineering.demos.prompt_chaining_demo
+uv run --project projects/workflow-engineering python -m workflow_engineering.demos.prompt_chaining_demo
+uv run --project projects/workflow-engineering python -m workflow_engineering.demos.routing_demo
+uv run --project projects/workflow-engineering python -m workflow_engineering.demos.parallel_travel_demo
+uv run --project projects/workflow-engineering python -m workflow_engineering.demos.rental_selection_demo
 ```
 
-## Routing
+The routing input can be changed to observe `PURCHASE`, `CAREER`, `TRAVEL`, and `GENERAL`. The parallelization demo makes live external API calls; the rental demo requires the MongoDB settings above.
 
-```bash
-uv run --project projects/workflow-engineering \
-  python -m workflow_engineering.demos.routing_demo
-```
-
-The routing demonstration can be changed to observe different semantic routes and downstream execution paths.
-
-Examples:
-
-```text
-Laptop decision        → PURCHASE
-AI certification       → CAREER
-Vacation decision      → TRAVEL
-Personal scheduling    → GENERAL
-```
-
-## Parallelization + Aggregation
-
-```bash
-uv run --project projects/workflow-engineering \
-  python -m workflow_engineering.demos.parallel_travel_demo
-```
-
-The demonstration performs real external API calls and requires the corresponding environment configuration.
-
-It demonstrates:
-
-```text
-Claude tool selection
-        ↓
-Concurrent provider execution
-        ↓
-Tool result collection
-        ↓
-Claude semantic aggregation
-```
-
----
-
-# Engineering Validation
-
-The project uses automated tests, linting, and static type checking.
-
-Run tests:
+## Validation
 
 ```bash
 uv run pytest -q
-```
-
-Run Ruff:
-
-```bash
 uv run ruff check projects/workflow-engineering
-```
-
-Run Pyright:
-
-```bash
 uv run pyright projects/workflow-engineering
 ```
 
-The current implementation passes:
+Tests cover workflow behavior and static correctness. The runnable demonstrations exercise live model behavior for Prompt Chaining, Routing, and Parallelization + Aggregation.
+
+## Current boundary and next step
 
 ```text
-pytest
-ruff
-pyright
+Prompt Chaining               predefined sequence
+Routing                       model-selected predefined branch
+Parallelization + Aggregation model-selected capabilities + app concurrency
+Evaluator–Optimizer           model evaluation + bounded feedback refinement
 ```
 
-Validation covers workflow behavior as well as static correctness.
-
-Live model behavior has also been exercised through runnable demonstrations for:
-
-```text
-Prompt Chaining
-Routing
-Parallelization + Aggregation
-```
-
----
-
-# Current Engineering Boundary
-
-The project now demonstrates four increasingly dynamic workflow patterns:
-
-```text
-Prompt Chaining
-      ↓
-Predefined sequential execution
-
-
-Routing
-      ↓
-Model-selected predefined branch
-
-
-Parallelization + Aggregation
-      ↓
-Model-selected capabilities
-+
-application-managed concurrent execution
-+
-model-based semantic aggregation
-
-
-Evaluator–Optimizer
-      ↓
-model-generated recommendation
-+
-semantic evaluation
-+
-feedback-driven bounded refinement
-+
-application-controlled termination
-```
-
-The current implementation intentionally does not yet introduce:
-
-- autonomous agent loops
-- persistent memory
-- multi-agent coordination
-- arbitrary model-directed execution
-- custom agent harnesses
-
-Tool execution and iterative refinement are present, but they remain inside
-controlled workflows.
-
-At the current stage:
-
-```text
-Application
-    ↓
-owns execution lifecycle,
-concurrency, boundaries,
-validation, retries, optimization limits,
-failure handling and termination
-
-
-Claude
-    ↓
-performs reasoning,
-route selection,
-tool selection, aggregation, evaluation,
-and refinement
-within those boundaries
-```
-
-The objective is to understand these control boundaries clearly before increasing model autonomy.
-
----
-
-# Next — Orchestrator–Worker
-
-The next workflow pattern introduces dynamic task decomposition and
-delegation. Instead of repeatedly refining one result, an orchestrator
-analyzes a goal and determines which specialized pieces of work are required.
-
-```text
-User Goal
-    ↓
-Orchestrator
-    ↓
-Task Decomposition
-    │
-    ├── Worker A
-    ├── Worker B
-    └── Worker C
-          ↓
-     Worker Results
-          ↓
-      Orchestrator
-          ↓
-      Final Result
-```
-
-This introduces the next engineering question:
-
-> How can Claude dynamically decompose a goal into specialized units of work while the application still maintains explicit execution boundaries and control?
-
-That becomes **Workflow Pattern 05 — Orchestrator–Worker**.
+The project intentionally does not yet introduce autonomous loops, persistent memory, multi-agent coordination, arbitrary model-directed execution, or a custom agent harness. Claude performs reasoning within application-owned boundaries; the next pattern, Orchestrator–Worker, will explore dynamic task decomposition and delegation while retaining explicit execution control.

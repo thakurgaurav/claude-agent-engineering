@@ -32,7 +32,7 @@ from workflow_engineering.workflows.rental_selection_workflow import (
 
 USER_REQUEST = """
 I'm looking for a 2-bedroom apartment in San Jose.
-My absolute maximum is $3,500.
+My absolute maximum is $4,000.
 I have a dog, so pets must be allowed, and I need parking.
 
 Safety is extremely important. I'd prefer something newer and spacious,
