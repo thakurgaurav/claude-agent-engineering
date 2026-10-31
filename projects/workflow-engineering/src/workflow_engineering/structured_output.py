@@ -90,7 +90,9 @@ def call_structured_tool[OutputT: BaseModel](
         except ValidationError as exc:
             validation_errors.append(
                 f"Attempt {attempt}: invalid tool input "
-                f"{tool_input!r}. Validation error: {exc}"
+                f"{tool_input!r}. "
+                f"stop_reason={response.stop_reason!r}. "
+                f"Validation error: {exc}"
             )
 
     details = "\n".join(validation_errors)

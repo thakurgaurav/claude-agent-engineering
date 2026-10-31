@@ -10,7 +10,7 @@ A hands-on demonstration of controlled AI workflow patterns using Claude. Applic
 | Routing | ✅ Implemented |
 | Parallelization + Aggregation | ✅ Implemented |
 | Evaluator–Optimizer | ✅ Implemented |
-| Orchestrator–Worker | ⬜ Next |
+| Orchestrator–Worker | ✅ Implemented |
 
 ## 01 — Prompt Chaining
 
@@ -126,6 +126,56 @@ Claude separates deterministic hard constraints (city, rent, bedrooms, bathrooms
 
 The generator and optimizer return validated `RentalRecommendationOutput` values, and selected IDs must belong to the eligible set. The evaluator returns `PASS` or `NEEDS_REVISION` with actionable feedback. The application owns the loop and termination; the demo configures `max_optimization_iterations=2`. A passing initial result skips optimization, and repeated rejection stops at the limit—optimization does not guarantee convergence.
 
+## 05 — Orchestrator–Worker
+
+This workflow demonstrates an Educational Advocate / Legal Case Preparation Assistant using synthetic legal scenarios only. It uses the Orchestrator–Worker pattern: Claude dynamically determines what substantial work is required for a specific case, while application code owns execution, concurrency, failure handling, stopping, and synthesis.
+
+```text
+Client case description
+    ↓
+Orchestrator
+    ↓
+ExecutionPlan containing dynamically generated CaseTask objects
+    ↓
+N generic workers executing independent tasks concurrently
+    ↓
+WorkerExecution[] containing successes and failures
+    ↓
+Synthesizer
+    ↓
+CasePreparationSummary
+```
+
+```mermaid
+flowchart TD
+    A[Client case description] --> B[Claude orchestrator]
+    B --> P[ExecutionPlan: 1–6 CaseTask objects]
+    P --> W1[Generic worker: CaseTask 1]
+    P --> W2[Generic worker: CaseTask 2]
+    P --> WN[Generic worker: CaseTask N]
+    W1 --> R["WorkerExecution[]"]
+    W2 --> R
+    WN --> R
+    R --> S[Claude synthesizer]
+    S --> O[CasePreparationSummary]
+    W1 -. isolated failure .-> R
+    W2 -. isolated failure .-> R
+```
+
+The key distinction from Lab 03 — Parallelization + Aggregation is that Lab 03 starts with a known set of parallel work. In Lab 05, Claude dynamically determines which work needs to exist; the application then executes those generated tasks concurrently. The number and nature of worker tasks are therefore dynamic. During testing, the same employment scenario produced different valid decompositions and task counts across runs rather than a fixed list of predefined worker roles.
+
+The orchestrator in `orchestrators/legal_case_orchestrator.py` creates a validated `ExecutionPlan` containing 1–6 `CaseTask` objects, each with a `task_id`, `title`, and `objective`. It plans work but does not perform case analysis. `workers/legal_case_worker.py` is one generic worker whose runtime specialization comes from the dynamic task; each worker receives the original case and exactly one task, then returns a structured `WorkerResult` with `task_id`, `findings`, `uncertainties`, and `verification_items`. Workers do not create tasks or produce the final assessment.
+
+`workflows/legal_case_execution.py` defines reusable `SuccessfulWorkerExecution`, `FailedWorkerExecution`, and `WorkerExecution` contracts. `workflows/legal_case_workflow.py` owns coordination: it runs independent workers concurrently with `asyncio.to_thread()` and `asyncio.gather(..., return_exceptions=True)`, isolates failures, verifies task identity, preserves successful results, and passes the complete execution plan and worker-execution state to the synthesizer. `synthesizers/legal_case_synthesizer.py` consolidates results into a `CasePreparationSummary` with `overview`, `key_findings`, `uncertainties`, `verification_items`, and `incomplete_areas`; failed tasks remain visible through `incomplete_areas`. The three Lab 05 prompt files establish these component boundaries and legal-safety constraints.
+
+The model-call pattern is one orchestrator call, `N` concurrent worker calls, and one synthesizer call: `N + 2` Claude model calls. Multiple tasks do not automatically imply concurrency; the application owns concurrency, execution policy, and stopping. The generic worker is reused instead of creating hard-coded worker roles. Structured Pydantic contracts define component boundaries, and a failed worker must not discard successful results or be silently reanalyzed by the synthesizer. During development, a structured-output failure caused by `response.stop_reason='max_tokens'` led to a higher worker token ceiling and tighter output instructions.
+
+### Safety and scope
+
+This is an educational demonstration of the Orchestrator–Worker engineering pattern. All legal scenarios are synthetic. It is not legal advice and is not a production legal system. It does not use authoritative or guaranteed-current legal sources. Model-generated legal rules, deadlines, jurisdiction-specific matters, and similar claims require verification against authoritative current sources.
+
+A production implementation would need authoritative retrieval and verified legal-data integrations, such as appropriate tools or other controlled data connections, along with suitable security and privacy controls, evaluation, and professional review.
+
 ## Project organization
 
 ```text
@@ -133,6 +183,10 @@ src/workflow_engineering/
 ├── demos/       # runnable demonstrations
 ├── prompts/     # packaged model instructions
 ├── tools/       # Claude-facing tools and provider integrations
+├── orchestrators/
+├── workers/
+├── synthesizers/
+├── workflows/   # workflow coordination and execution contracts
 ├── config.py    # environment-backed configuration
 ├── model.py     # common text-oriented Claude invocation
 ├── parallelization.py
@@ -178,6 +232,8 @@ uv run --project projects/workflow-engineering python -m workflow_engineering.de
 uv run --project projects/workflow-engineering python -m workflow_engineering.demos.routing_demo
 uv run --project projects/workflow-engineering python -m workflow_engineering.demos.parallel_travel_demo
 uv run --project projects/workflow-engineering python -m workflow_engineering.demos.rental_selection_demo
+uv run --project projects/workflow-engineering \
+  python -m workflow_engineering.demos.legal_case_workflow_demo
 ```
 
 The routing input can be changed to observe `PURCHASE`, `CAREER`, `TRAVEL`, and `GENERAL`. The parallelization demo makes live external API calls; the rental demo requires the MongoDB settings above.
@@ -190,7 +246,7 @@ uv run ruff check projects/workflow-engineering
 uv run pyright projects/workflow-engineering
 ```
 
-Tests cover workflow behavior and static correctness. The runnable demonstrations exercise live model behavior for Prompt Chaining, Routing, and Parallelization + Aggregation.
+Tests cover workflow behavior and static correctness. Lab 05 includes automated tests for synthesizer failure visibility, workflow worker-failure isolation, continuation to synthesis after an individual worker failure, preserving successful worker executions, and passing complete execution state into synthesis. Current project validation is 16 tests passing, Ruff clean, and Pyright clean. The runnable demonstrations exercise live model behavior for Prompt Chaining, Routing, Parallelization + Aggregation, and Orchestrator–Worker.
 
 ## Current boundary and next step
 
@@ -199,6 +255,7 @@ Prompt Chaining               predefined sequence
 Routing                       model-selected predefined branch
 Parallelization + Aggregation model-selected capabilities + app concurrency
 Evaluator–Optimizer           model evaluation + bounded feedback refinement
+Orchestrator–Worker           dynamic task decomposition + app-owned concurrent execution
 ```
 
-The project intentionally does not yet introduce autonomous loops, persistent memory, multi-agent coordination, arbitrary model-directed execution, or a custom agent harness. Claude performs reasoning within application-owned boundaries; the next pattern, Orchestrator–Worker, will explore dynamic task decomposition and delegation while retaining explicit execution control.
+The project intentionally does not introduce autonomous loops, persistent memory, multi-agent coordination, arbitrary model-directed execution, or a custom agent harness. Claude performs reasoning within application-owned boundaries; Lab 05 adds dynamic task decomposition and delegation while retaining explicit execution control.
