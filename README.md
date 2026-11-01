@@ -2,6 +2,18 @@
 
 An engineering showcase for building AI workflows and agentic systems with Claude. The repository progresses from application-controlled workflows toward agents, tools, context, memory, multi-agent systems, runtimes, reliability, security, and evaluation.
 
+## Learning & Demonstration Scope
+
+This repository is a **hands-on AI engineering learning project** designed to demonstrate workflow and agentic patterns through clear, isolated implementations.
+
+The examples intentionally make architectural boundaries visible—such as prompt chaining, routing, parallel execution, evaluation loops, and orchestration. In some labs, this means using multiple model calls or explicitly separating responsibilities that could potentially be handled with fewer calls in a production implementation.
+
+These examples should therefore be treated as **pattern demonstrations, not prescriptive production architectures**.
+
+For a real system, the appropriate design depends on the problem, model capability, reliability requirements, latency, cost, observability, and the level of deterministic control required.
+
+**The goal is not to maximize model calls, workflow stages, or agentic behavior. Use the simplest architecture that reliably solves the problem, and introduce additional structure only when it provides a clear engineering benefit.**
+
 ## Engineering approach
 
 > Understand and demonstrate the underlying engineering mechanism before introducing higher-level abstractions.
