@@ -2,6 +2,12 @@
 
 A hands-on demonstration of controlled AI workflow patterns using Claude. Application code coordinates model reasoning through predefined execution structures before introducing autonomous agents.
 
+## Implementation Scope
+
+The workflow patterns in this project are intentionally implemented with explicit, application-owned orchestration rather than the Claude Agent SDK. This keeps the control flow, state transitions, execution boundaries, concurrency, validation, and stopping behavior visible for learning and makes the underlying engineering mechanisms easier to inspect.
+
+Agentic architectures and Claude Agent SDK implementations will be developed separately under dedicated agent modules. Those examples will build on the workflow foundations demonstrated here while exploring higher-level agent capabilities and abstractions.
+
 ## Workflow patterns
 
 | Pattern | Status |
