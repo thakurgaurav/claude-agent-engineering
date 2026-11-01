@@ -14,6 +14,25 @@ For a real system, the appropriate design depends on the problem, model capabili
 
 **The goal is not to maximize model calls, workflow stages, or agentic behavior. Use the simplest architecture that reliably solves the problem, and introduce additional structure only when it provides a clear engineering benefit.**
 
+## Architecture & Anthropic SDK Distinction
+
+This repository intentionally separates **agentic architecture patterns** from **Anthropic SDK abstractions**.
+
+The workflow-engineering labs implement patterns such as Prompt Chaining, Routing, Parallelization, Evaluator–Optimizer, and Orchestrator–Worker explicitly in application code. Where model calls are required, they use Anthropic’s standard API client; the orchestration itself remains explicit. This makes model responsibilities, validation, concurrency, failure handling, and stopping behavior visible rather than hiding those mechanics behind a higher-level framework.
+
+The repository structure—including `shared/` and `projects/`—is a production-oriented organization used by this learning project. It should not be interpreted as a directory structure prescribed by Anthropic.
+
+The **Claude Agent SDK** is introduced separately during the Agents phase, where the focus shifts from predefined application-controlled workflows toward model-directed agent loops, tool use, context and state management, permissions, hooks, sub-agents, and other agent-runtime capabilities.
+
+Throughout the repository, we distinguish between:
+
+- **Architecture patterns** — general techniques for designing workflows and agents.
+- **Application architecture** — how this repository organizes and implements those techniques.
+- **Anthropic APIs and SDKs** — capabilities provided by Anthropic that may implement or abstract parts of the runtime.
+- **Claude Code conventions** — development-time mechanisms such as `CLAUDE.md` and `.claude/`, which are separate from the runtime architecture of the applications being built.
+
+The goal is to understand the underlying engineering mechanics first, and then understand what higher-level SDKs and frameworks provide or abstract.
+
 ## Engineering approach
 
 > Understand and demonstrate the underlying engineering mechanism before introducing higher-level abstractions.

@@ -4,9 +4,13 @@ A hands-on demonstration of controlled AI workflow patterns using Claude. Applic
 
 ## Implementation Scope
 
-The workflow patterns in this project are intentionally implemented with explicit, application-owned orchestration rather than the Claude Agent SDK. This keeps the control flow, state transitions, execution boundaries, concurrency, validation, and stopping behavior visible for learning and makes the underlying engineering mechanisms easier to inspect.
+The workflow patterns in this project are intentionally implemented with explicit, application-owned orchestration rather than relying on the higher-level Claude Agent SDK. Where model calls are required, the labs use Anthropic’s standard API client; the orchestration itself remains visible in application code. This keeps the control flow, state transitions, execution boundaries, concurrency, validation, failure handling, and stopping behavior visible for learning and makes the underlying engineering mechanisms easier to inspect.
 
-Agentic architectures and Claude Agent SDK implementations will be developed separately under dedicated agent modules. Those examples will build on the workflow foundations demonstrated here while exploring higher-level agent capabilities and abstractions.
+This repository’s organization—including `shared/` and `projects/`—is a production-oriented structure used by this learning project, not a directory structure prescribed by Anthropic. Agentic architectures and Claude Agent SDK implementations will be developed separately under dedicated agent modules. Those examples will build on the workflow foundations demonstrated here while exploring model-directed agent loops, tool use, context and state management, permissions, hooks, sub-agents, and other agent-runtime capabilities.
+
+Throughout the repository, **architecture patterns** refer to general workflow and agent design techniques; **application architecture** refers to how this repository organizes and implements them; **Anthropic APIs and SDKs** refer to capabilities that may implement or abstract parts of the runtime; and **Claude Code conventions** such as `CLAUDE.md` and `.claude/` refer to development-time mechanisms separate from application runtime architecture.
+
+The goal is to understand the underlying engineering mechanics first, and then understand what higher-level SDKs and frameworks provide or abstract.
 
 ## Workflow patterns
 
